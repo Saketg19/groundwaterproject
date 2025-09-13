@@ -72,7 +72,8 @@ with tab1:
         try:
             # Load data from the URL specified in Streamlit's secrets
             data_url = st.secrets["DATA_URL"]
-            df = pd.read_csv(data_url)
+            # Use the 'python' engine to be more robust against formatting errors
+            df = pd.read_csv(data_url, engine='python')
 
             df['Date'] = pd.to_datetime(df['Date'])
             df = df.sort_values('Date').reset_index(drop=True)

@@ -70,7 +70,12 @@ with tab1:
     @st.cache_data
     def load_data():
         try:
-            df = pd.read_csv("DWLR_Dataset_2023.csv")
+            # --- MODIFIED SECTION ---
+            # Load data from the URL specified in Streamlit's secrets
+            data_url = st.secrets["DATA_URL"]
+            df = pd.read_csv(data_url)
+            # --- END OF MODIFICATION ---
+
             df['Date'] = pd.to_datetime(df['Date'])
             df = df.sort_values('Date').reset_index(drop=True)
 
@@ -88,8 +93,8 @@ with tab1:
 
             df = df.dropna()
             return df
-        except FileNotFoundError:
-            st.error("❌ DWLR_Dataset_2023.csv file not found.")
+        except Exception as e:
+            st.error(f"❌ Error loading data from the remote URL: {e}")
             return None
 
     df = load_data()
@@ -152,16 +157,16 @@ with tab1:
         fig_env = make_subplots(rows=2, cols=2,
             subplot_titles=('Temperature (°C)', 'Rainfall (mm)', 'pH', 'Dissolved Oxygen (mg/L)'))
         fig_env.add_trace(go.Scatter(x=filtered_df['Date'], y=filtered_df['Temperature_C'], name='Temp'),
-                          row=1, col=1)
+                            row=1, col=1)
         fig_env.add_trace(go.Scatter(x=filtered_df['Date'], y=filtered_df['Rainfall_mm'], name='Rain'),
-                          row=1, col=2)
+                            row=1, col=2)
         fig_env.add_trace(go.Scatter(x=filtered_df['Date'], y=filtered_df['pH'], name='pH'),
-                          row=2, col=1)
+                            row=2, col=1)
         fig_env.add_trace(go.Scatter(x=filtered_df['Date'], y=filtered_df['Dissolved_Oxygen_mg_L'], name='DO'),
-                          row=2, col=2)
+                            row=2, col=2)
         st.plotly_chart(fig_env, use_container_width=True)
 
-    # (ML training + predictions section from your big code can be kept here unchanged)
+    # (Your ML training + predictions section can be kept here unchanged)
 
 # ==============================================================
 # TAB 2: Advanced Forecast Options

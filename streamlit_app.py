@@ -78,9 +78,13 @@ if 'model_metrics' not in st.session_state:
 # Load data function
 @st.cache_data
 def load_data():
-    """Load and preprocess the groundwater data"""
+    """Load and preprocess the groundwater data from a remote URL"""
     try:
-        df = pd.read_csv("DWLR_Dataset_2023.csv")
+        # Load data from the URL specified in Streamlit's secrets
+        data_url = st.secrets["DATA_URL"]
+        # Use robust settings to handle potential CSV formatting issues
+        df = pd.read_csv(data_url, engine='python', on_bad_lines='skip')
+
         df['Date'] = pd.to_datetime(df['Date'])
         df = df.sort_values('Date').reset_index(drop=True)
 
@@ -103,8 +107,8 @@ def load_data():
         df = df.dropna()
 
         return df
-    except FileNotFoundError:
-        st.error("❌ DWLR_Dataset_2023.csv file not found. Please ensure the file is in the same directory.")
+    except Exception as e:
+        st.error(f"❌ Error loading data from the remote URL. Make sure the 'DATA_URL' secret is set correctly. Error: {e}")
         return None
 
 # Load data

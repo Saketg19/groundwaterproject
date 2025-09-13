@@ -72,10 +72,14 @@ with tab1:
         try:
             # Load data from the URL specified in Streamlit's secrets
             data_url = st.secrets["DATA_URL"]
-            # --- MODIFIED LINE ---
-            # Use the 'python' engine to handle potential formatting errors in the CSV
             df = pd.read_csv(data_url, engine='python', on_bad_lines='skip')
-            # --- END OF MODIFICATION ---
+
+            # --- NEW DEBUGGING LINES ---
+            st.write("### Raw Data Head:")
+            st.write(df.head())
+            st.write("### Raw Data Columns:")
+            st.write(df.columns)
+            # --- END OF DEBUGGING ---
 
             df['Date'] = pd.to_datetime(df['Date'])
             df = df.sort_values('Date').reset_index(drop=True)
@@ -189,7 +193,7 @@ with tab2:
         if st.button("Run Advanced Forecast"):
             st.info("⚡ Fetching NASA POWER data...")
             try:
-                lat, lon = 28.6, 72.2
+                lat, lon = 28.6, 77.2
                 if map_data and map_data.get("last_clicked"):
                     lat = map_data["last_clicked"]["lat"]
                     lon = map_data["last_clicked"]["lng"]

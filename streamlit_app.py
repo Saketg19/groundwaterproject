@@ -69,14 +69,13 @@ with tab1:
 
     @st.cache_data
     def load_data():
-        # --- NEW DEBUGGING LINE ---
-        # This will show us exactly what secrets are available to the app.
-        st.write("Available secrets:", st.secrets.to_dict())
-        # --------------------------
         try:
             # Load data from the URL specified in Streamlit's secrets
             data_url = st.secrets["DATA_URL"]
-            df = pd.read_csv(data_url)
+            # --- MODIFIED LINE ---
+            # Use the 'python' engine to handle potential formatting errors in the CSV
+            df = pd.read_csv(data_url, engine='python', on_bad_lines='skip')
+            # --- END OF MODIFICATION ---
 
             df['Date'] = pd.to_datetime(df['Date'])
             df = df.sort_values('Date').reset_index(drop=True)
@@ -190,7 +189,7 @@ with tab2:
         if st.button("Run Advanced Forecast"):
             st.info("⚡ Fetching NASA POWER data...")
             try:
-                lat, lon = 28.6, 77.2
+                lat, lon = 28.6, 72.2
                 if map_data and map_data.get("last_clicked"):
                     lat = map_data["last_clicked"]["lat"]
                     lon = map_data["last_clicked"]["lng"]

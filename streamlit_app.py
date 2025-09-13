@@ -86,16 +86,11 @@ if 'feature_importance' not in st.session_state:
 if 'model_metrics' not in st.session_state:
     st.session_state.model_metrics = None
 
-# Load data function
+# Data processing function
 @st.cache_data
-def load_data():
-    """Load and preprocess the groundwater data from a remote URL"""
+def process_data(df):
+    """Preprocess the uploaded dataframe"""
     try:
-        # Load data from the URL specified in Streamlit's secrets
-        data_url = st.secrets["DATA_URL"]
-        # Use robust settings to handle potential CSV formatting issues
-        df = pd.read_csv(data_url, engine='python', on_bad_lines='skip')
-
         df['Date'] = pd.to_datetime(df['Date'])
         df = df.sort_values('Date').reset_index(drop=True)
 
@@ -114,19 +109,31 @@ def load_data():
         df['Water_Level_ma7'] = df['Water_Level_m'].rolling(window=7).mean()
         df['Rainfall_ma7'] = df['Rainfall_mm'].rolling(window=7).mean()
 
-        # Remove rows with NaN values
+        # Remove rows with NaN values created by feature engineering
         df = df.dropna()
-
         return df
     except Exception as e:
-        st.error(f"❌ Error loading data from the remote URL. Make sure the 'DATA_URL' secret is set correctly. Error: {e}")
+        st.error(f"❌ Error processing the uploaded file. Please ensure it has the correct columns. Error: {e}")
         return None
 
-# Load data
-df = load_data()
+# File Uploader
+uploaded_file = st.file_uploader("Upload your groundwater data CSV file", type=["csv"])
+
+if uploaded_file is None:
+    st.info("Please upload a CSV file to begin analysis.")
+    st.stop()
+
+# Load and process data
+try:
+    df_raw = pd.read_csv(uploaded_file, engine='python', on_bad_lines='skip')
+    df = process_data(df_raw)
+except Exception as e:
+    st.error(f"❌ Could not read the uploaded CSV file. Error: {e}")
+    st.stop()
 
 if df is None:
     st.stop()
+
 
 # Sidebar controls
 st.sidebar.header("📊 Controls")
@@ -179,7 +186,7 @@ with col4:
         status = "Safe ✅"
         status_class = "status-safe"
     elif 3 < avg_level <= 5:
-        status = "Semi-Critical ⚠"
+        status = "Semi-Critical ⚠️"
         status_class = "status-semi-critical"
     elif 2 < avg_level <= 3:
         status = "Critical ❗"
@@ -233,7 +240,7 @@ st.plotly_chart(fig, use_container_width=True)
 
 # Environmental factors
 if show_environmental:
-    st.header("🌡 Environmental Factors")
+    st.header("🌡️ Environmental Factors")
 
     # Create subplots for environmental factors
     fig_env = make_subplots(
@@ -268,7 +275,7 @@ if show_environmental:
 
 # Machine Learning Section
 st.header("🤖 Machine Learning Model Training")
-st.markdown("Choose from *13 different algorithms* including 5 newly added models!")
+st.markdown("Choose from *13 different algorithms* including 6 newly added models!")
 
 # Model selection with categorization
 model_categories = {
@@ -310,6 +317,7 @@ with col2:
     new_badge = '<span class="new-model">NEW!</span>' if is_new else ""
     st.markdown(f"*Description:* {model_description} {new_badge}", unsafe_allow_html=True)
 
+
 # Feature selection
 st.subheader("🔧 Feature Selection")
 feature_options = {
@@ -342,6 +350,7 @@ with col2:
         n_estimators = st.selectbox("Number of Trees", [50, 100, 200], index=1)
     elif model_type == "K-Neighbors Regressor":
         k_neighbors = st.selectbox("Number of Neighbors", [3, 5, 7, 10], index=1)
+
 
 # Prepare data for ML
 X = filtered_df[selected_features]
@@ -393,8 +402,8 @@ if st.button("🚀 Train Model", type="primary"):
             elif model_type == "MLP Regressor":
                 hidden_size = locals().get('hidden_layers', 100)
                 model = MLPRegressor(
-                    hidden_layer_sizes=(hidden_size, hidden_size//2), 
-                    random_state=42, 
+                    hidden_layer_sizes=(hidden_size, hidden_size//2),
+                    random_state=42,
                     max_iter=1000,
                     early_stopping=True,
                     validation_fraction=0.1
@@ -440,16 +449,16 @@ if st.button("🚀 Train Model", type="primary"):
             if hasattr(model, 'feature_importances_'):
                 st.session_state.feature_importance = dict(zip(selected_features, model.feature_importances_))
             elif hasattr(model, 'coef_'):
-                # Handle different coefficient shapes
                 coef = model.coef_
                 if len(coef.shape) > 1:
                     coef = coef.flatten()
                 st.session_state.feature_importance = dict(zip(selected_features, abs(coef)))
 
             st.success(f"{model_type} model trained successfully! 🎉")
-            
+
         except Exception as e:
             st.error(f"Error training model: {str(e)}")
+
 
 # Display model performance
 if st.session_state.model_trained:
@@ -471,13 +480,12 @@ if st.session_state.model_trained:
     with col4:
         st.markdown(f'<div class="model-performance"><strong>CV Score</strong><br>{metrics["cv_mean"]:.3f} ± {metrics["cv_std"]:.3f}</div>', unsafe_allow_html=True)
 
-    # Additional performance metrics
+    # Detailed performance analysis
     st.subheader("🔍 Detailed Performance Analysis")
     
     col1, col2 = st.columns(2)
     
     with col1:
-        # Model comparison chart (if multiple models have been trained)
         st.markdown("*Training vs Test Performance*")
         performance_data = pd.DataFrame({
             'Metric': ['R²', 'RMSE', 'MAE'],
@@ -493,16 +501,16 @@ if st.session_state.model_trained:
         st.plotly_chart(fig_perf, use_container_width=True)
 
     with col2:
-        # Cross-validation scores distribution
         st.markdown("*Cross-Validation Scores*")
         try:
-            cv_scores = cross_val_score(st.session_state.trained_model, 
-                                      st.session_state.scaler.transform(X), y, cv=5, scoring='r2')
-            fig_cv = px.box(y=cv_scores, title="CV Score Distribution")
+            cv_scores_full = cross_val_score(st.session_state.trained_model,
+                                         st.session_state.scaler.transform(X), y, cv=5, scoring='r2')
+            fig_cv = px.box(y=cv_scores_full, title="CV Score Distribution")
             fig_cv.update_layout(yaxis_title="R² Score")
             st.plotly_chart(fig_cv, use_container_width=True)
         except:
             st.info("Cross-validation visualization not available for this model.")
+
 
     # Feature importance plot
     if st.session_state.feature_importance:
@@ -586,6 +594,7 @@ if st.session_state.model_trained:
         )
         st.plotly_chart(fig_residual_hist, use_container_width=True)
 
+
 # Prediction Interface
 st.header("🔮 Make Predictions")
 
@@ -626,10 +635,9 @@ if st.session_state.model_trained:
                 elif feature == 'Dissolved_Oxygen_mg_L':
                     input_data[feature] = do
                 elif feature not in input_data: # For lag/rolling features not covered above
-                    # Use the mean of the column from the original filtered data as a placeholder
                     input_data[feature] = filtered_df[feature].mean()
 
-            # Convert to DataFrame and scale, ensuring column order is correct
+            # Convert to DataFrame and scale
             input_df = pd.DataFrame([input_data])[st.session_state.selected_features]
             input_scaled = st.session_state.scaler.transform(input_df)
 
@@ -637,14 +645,14 @@ if st.session_state.model_trained:
             prediction = st.session_state.trained_model.predict(input_scaled)[0]
 
             # Display result
-            st.success(f"🎯 *Predicted Water Level: {prediction:.2f} meters*")
+            st.success(f"🎯 **Predicted Water Level: {prediction:.2f} meters**")
 
             # Status interpretation
             if prediction > 5:
                 status = "Safe ✅"
                 status_color = "green"
             elif 3 < prediction <= 5:
-                status = "Semi-Critical ⚠"
+                status = "Semi-Critical ⚠️"
                 status_color = "orange"
             elif 2 < prediction <= 3:
                 status = "Critical ❗"
@@ -653,20 +661,80 @@ if st.session_state.model_trained:
                 status = "Over-exploited ❌"
                 status_color = "darkred"
 
-            st.markdown(f'*Status:* <span style="color: {status_color}">{status}</span>', unsafe_allow_html=True)
+            st.markdown(f'**Status:** <span style="color: {status_color}">{status}</span>', unsafe_allow_html=True)
             
-            # Confidence visualization (if available)
-            if hasattr(st.session_state.trained_model, 'predict_proba'):
-                st.info("This model provides prediction confidence intervals.")
-    
     with col2:
-        if st.button("📊 Batch Prediction", type="secondary"):
-            st.info("Upload a CSV file with the same features to make batch predictions!")
-            uploaded_file = st.file_uploader("Choose CSV file", type="csv")
+        if st.checkbox("📊 Perform Batch Prediction"):
+            batch_file = st.file_uploader("Upload CSV for Batch Prediction", type="csv", key="batch")
             
-            if uploaded_file is not None:
+            if batch_file is not None:
                 try:
-                    batch_df = pd.read_csv(uploaded_file)
-                    # Process batch predictions
-                    batch_scaled = st.session_state.scaler.transform(batch_df[st.session_state.selected_features])
-                    batch_predictions = st.session_state.trained_model.predict(batch_scaled)
+                    batch_df = pd.read_csv(batch_file, engine='python', on_bad_lines='skip')
+                    st.write("Uploaded Batch Data:", batch_df.head())
+
+                    required_cols = st.session_state.selected_features
+                    if not all(col in batch_df.columns for col in required_cols):
+                        missing_cols = set(required_cols) - set(batch_df.columns)
+                        st.error(f"The uploaded file is missing required columns: {', '.join(missing_cols)}")
+                    else:
+                        batch_scaled = st.session_state.scaler.transform(batch_df[required_cols])
+                        batch_predictions = st.session_state.trained_model.predict(batch_scaled)
+
+                        results_df = batch_df.copy()
+                        results_df['Predicted_Water_Level_m'] = batch_predictions
+                        st.success("Batch prediction complete!")
+                        st.dataframe(results_df)
+
+                        csv_results = results_df.to_csv(index=False).encode('utf-8')
+                        st.download_button(
+                            label="📥 Download Predictions",
+                            data=csv_results,
+                            file_name='batch_predictions.csv',
+                            mime='text/csv',
+                        )
+                except Exception as e:
+                    st.error(f"An error occurred during batch prediction: {e}")
+
+else:
+    st.info("Please train a model first to make predictions.")
+
+# Model Export
+st.header("💾 Model Management")
+
+if st.session_state.model_trained:
+    if st.button("💾 Export Model"):
+        model_data = {
+            'model': st.session_state.trained_model,
+            'scaler': st.session_state.scaler,
+            'features': st.session_state.selected_features,
+            'model_type': st.session_state.model_type,
+            'metrics': st.session_state.model_metrics
+        }
+
+        # Save model
+        joblib.dump(model_data, 'groundwater_model.pkl')
+        st.success("Model exported as 'groundwater_model.pkl'")
+
+# Data table
+st.header("📋 Data Table")
+st.dataframe(filtered_df, use_container_width=True)
+
+# Download button
+csv = filtered_df.to_csv(index=False)
+st.download_button(
+    label="📥 Download Data as CSV",
+    data=csv,
+    file_name=f"groundwater_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+    mime="text/csv"
+)
+
+# Footer
+st.markdown("---")
+st.markdown("""
+<div style='text-align: center; color: #666; padding: 2rem;'>
+    <p>💧 Groundwater Level ML Analysis Dashboard</p>
+    <p>Built with ❤️ using Streamlit and Scikit-learn</p>
+    <p>Enhanced version of your original model with ML capabilities!</p>
+</div>
+""", unsafe_allow_html=True)
+

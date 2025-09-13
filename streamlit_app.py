@@ -1,6 +1,6 @@
 """
 Enhanced Streamlit app for Groundwater Level Analysis with Machine Learning
-Combines your existing model logic with proper ML training
+Combines your existing model logic with proper ML training - Now with 13 ML algorithms!
 """
 
 import streamlit as st
@@ -15,10 +15,12 @@ warnings.filterwarnings('ignore')
 
 # ML Libraries
 from sklearn.model_selection import train_test_split, cross_val_score
-from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, AdaBoostRegressor
-from sklearn.linear_model import LinearRegression, Lasso
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, AdaBoostRegressor, ExtraTreesRegressor
+from sklearn.linear_model import LinearRegression, Lasso, Ridge, ElasticNet, BayesianRidge
 from sklearn.svm import SVR
 from sklearn.neighbors import KNeighborsRegressor
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.neural_network import MLPRegressor
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 from sklearn.preprocessing import StandardScaler
 import xgboost as xgb
@@ -56,12 +58,21 @@ st.markdown("""
     .status-semi-critical { color: orange; font-weight: bold; }
     .status-critical { color: red; font-weight: bold; }
     .status-over-exploited { color: darkred; font-weight: bold; }
+    .new-model {
+        background-color: #fff3cd;
+        border: 1px solid #ffeaa7;
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.25rem;
+        font-size: 0.8rem;
+        color: #856404;
+        margin-left: 0.5rem;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # Title
 st.markdown('<h1 class="main-header">💧 Groundwater Level ML Analysis Dashboard</h1>', unsafe_allow_html=True)
-st.markdown("Enhanced analysis with machine learning predictions for groundwater levels.")
+st.markdown("Enhanced analysis with *13 machine learning algorithms* for groundwater level predictions.")
 
 # Initialize session state
 if 'model_trained' not in st.session_state:
@@ -168,7 +179,7 @@ with col4:
         status = "Safe ✅"
         status_class = "status-safe"
     elif 3 < avg_level <= 5:
-        status = "Semi-Critical ⚠️"
+        status = "Semi-Critical ⚠"
         status_class = "status-semi-critical"
     elif 2 < avg_level <= 3:
         status = "Critical ❗"
@@ -222,7 +233,7 @@ st.plotly_chart(fig, use_container_width=True)
 
 # Environmental factors
 if show_environmental:
-    st.header("🌡️ Environmental Factors")
+    st.header("🌡 Environmental Factors")
 
     # Create subplots for environmental factors
     fig_env = make_subplots(
@@ -257,16 +268,47 @@ if show_environmental:
 
 # Machine Learning Section
 st.header("🤖 Machine Learning Model Training")
+st.markdown("Choose from *13 different algorithms* including 5 newly added models!")
 
-# Model selection
-model_type = st.selectbox(
-    "Select Model Type",
-    [
-        "Random Forest", "Gradient Boosting", "Linear Regression", "XGBoost",
-        "SVR", "K-Neighbors Regressor", "AdaBoost Regressor", "Lasso"
-    ],
-    help="Choose the machine learning algorithm for groundwater level prediction"
-)
+# Model selection with categorization
+model_categories = {
+    "🌳 Tree-Based Models": {
+        "Random Forest": "Ensemble of decision trees with bagging",
+        "Gradient Boosting": "Sequential boosting algorithm",
+        "XGBoost": "Optimized gradient boosting framework",
+        "AdaBoost Regressor": "Adaptive boosting algorithm",
+        "Extra Trees": "Extremely randomized trees ensemble", # NEW
+        "Decision Tree": "Single decision tree regressor" # NEW
+    },
+    "📈 Linear Models": {
+        "Linear Regression": "Standard linear regression",
+        "Lasso": "L1 regularized linear regression",
+        "Ridge": "L2 regularized linear regression", # NEW
+        "Elastic Net": "L1 + L2 regularized linear regression", # NEW
+        "Bayesian Ridge": "Bayesian approach to ridge regression" # NEW
+    },
+    "🎯 Instance-Based & Neural": {
+        "K-Neighbors Regressor": "K-nearest neighbors algorithm",
+        "SVR": "Support Vector Regression",
+        "MLP Regressor": "Multi-layer Perceptron neural network" # NEW
+    }
+}
+
+# Display models by category
+selected_category = st.selectbox("Select Model Category", list(model_categories.keys()))
+model_options = list(model_categories[selected_category].keys())
+
+# Create columns for model selection with descriptions
+col1, col2 = st.columns([1, 2])
+
+with col1:
+    model_type = st.selectbox("Select Model", model_options)
+
+with col2:
+    model_description = model_categories[selected_category][model_type]
+    is_new = model_type in ["Extra Trees", "Decision Tree", "Ridge", "Elastic Net", "Bayesian Ridge", "MLP Regressor"]
+    new_badge = '<span class="new-model">NEW!</span>' if is_new else ""
+    st.markdown(f"*Description:* {model_description} {new_badge}", unsafe_allow_html=True)
 
 # Feature selection
 st.subheader("🔧 Feature Selection")
@@ -286,8 +328,20 @@ if not selected_features:
     st.warning("Please select at least one feature category.")
     st.stop()
 
-# Train/test split
-test_size = st.slider("Test Set Size (%)", 10, 40, 20) / 100
+# Train/test split and hyperparameters
+col1, col2 = st.columns(2)
+
+with col1:
+    test_size = st.slider("Test Set Size (%)", 10, 40, 20) / 100
+
+with col2:
+    # Model-specific hyperparameters
+    if model_type == "MLP Regressor":
+        hidden_layers = st.selectbox("Hidden Layer Size", [50, 100, 200], index=1)
+    elif model_type in ["Random Forest", "Extra Trees"]:
+        n_estimators = st.selectbox("Number of Trees", [50, 100, 200], index=1)
+    elif model_type == "K-Neighbors Regressor":
+        k_neighbors = st.selectbox("Number of Neighbors", [3, 5, 7, 10], index=1)
 
 # Prepare data for ML
 X = filtered_df[selected_features]
@@ -298,73 +352,104 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, r
 
 # Train model
 if st.button("🚀 Train Model", type="primary"):
-    with st.spinner("Training model..."):
+    with st.spinner(f"Training {model_type} model..."):
         # Scale features
         scaler = StandardScaler()
         X_train_scaled = scaler.fit_transform(X_train)
         X_test_scaled = scaler.transform(X_test)
 
-        # Select and train model
-        if model_type == "Random Forest":
-            model = RandomForestRegressor(n_estimators=100, random_state=42)
-        elif model_type == "Gradient Boosting":
-            model = GradientBoostingRegressor(n_estimators=100, random_state=42)
-        elif model_type == "XGBoost":
-            model = xgb.XGBRegressor(objective='reg:squarederror', n_estimators=100, random_state=42)
-        elif model_type == "SVR":
-            model = SVR(kernel='rbf')
-        elif model_type == "K-Neighbors Regressor":
-            model = KNeighborsRegressor(n_neighbors=5)
-        elif model_type == "AdaBoost Regressor":
-            model = AdaBoostRegressor(n_estimators=100, random_state=42)
-        elif model_type == "Lasso":
-            model = Lasso(random_state=42)
-        else: # Linear Regression
-            model = LinearRegression()
+        # Select and train model with enhanced parameters
+        try:
+            if model_type == "Random Forest":
+                n_est = locals().get('n_estimators', 100)
+                model = RandomForestRegressor(n_estimators=n_est, random_state=42, n_jobs=-1)
+            elif model_type == "Gradient Boosting":
+                model = GradientBoostingRegressor(n_estimators=100, random_state=42)
+            elif model_type == "XGBoost":
+                model = xgb.XGBRegressor(objective='reg:squarederror', n_estimators=100, random_state=42, n_jobs=-1)
+            elif model_type == "SVR":
+                model = SVR(kernel='rbf', C=1.0, gamma='scale')
+            elif model_type == "K-Neighbors Regressor":
+                k = locals().get('k_neighbors', 5)
+                model = KNeighborsRegressor(n_neighbors=k, n_jobs=-1)
+            elif model_type == "AdaBoost Regressor":
+                model = AdaBoostRegressor(n_estimators=100, random_state=42)
+            elif model_type == "Lasso":
+                model = Lasso(random_state=42, alpha=1.0)
+            elif model_type == "Linear Regression":
+                model = LinearRegression(n_jobs=-1)
+            # NEW MODELS
+            elif model_type == "Extra Trees":
+                n_est = locals().get('n_estimators', 100)
+                model = ExtraTreesRegressor(n_estimators=n_est, random_state=42, n_jobs=-1)
+            elif model_type == "Decision Tree":
+                model = DecisionTreeRegressor(random_state=42, max_depth=10)
+            elif model_type == "Ridge":
+                model = Ridge(random_state=42, alpha=1.0)
+            elif model_type == "Elastic Net":
+                model = ElasticNet(random_state=42, alpha=1.0, l1_ratio=0.5)
+            elif model_type == "Bayesian Ridge":
+                model = BayesianRidge()
+            elif model_type == "MLP Regressor":
+                hidden_size = locals().get('hidden_layers', 100)
+                model = MLPRegressor(
+                    hidden_layer_sizes=(hidden_size, hidden_size//2), 
+                    random_state=42, 
+                    max_iter=1000,
+                    early_stopping=True,
+                    validation_fraction=0.1
+                )
 
-        # Train model
-        model.fit(X_train_scaled, y_train)
+            # Train model
+            model.fit(X_train_scaled, y_train)
 
-        # Make predictions
-        y_pred_train = model.predict(X_train_scaled)
-        y_pred_test = model.predict(X_test_scaled)
+            # Make predictions
+            y_pred_train = model.predict(X_train_scaled)
+            y_pred_test = model.predict(X_test_scaled)
 
-        # Calculate metrics
-        train_r2 = r2_score(y_train, y_pred_train)
-        test_r2 = r2_score(y_test, y_pred_test)
-        train_rmse = np.sqrt(mean_squared_error(y_train, y_pred_train))
-        test_rmse = np.sqrt(mean_squared_error(y_test, y_pred_test))
-        train_mae = mean_absolute_error(y_train, y_pred_train)
-        test_mae = mean_absolute_error(y_test, y_pred_test)
+            # Calculate metrics
+            train_r2 = r2_score(y_train, y_pred_train)
+            test_r2 = r2_score(y_test, y_pred_test)
+            train_rmse = np.sqrt(mean_squared_error(y_train, y_pred_train))
+            test_rmse = np.sqrt(mean_squared_error(y_test, y_pred_test))
+            train_mae = mean_absolute_error(y_train, y_pred_train)
+            test_mae = mean_absolute_error(y_test, y_pred_test)
 
-        # Cross-validation score
-        cv_scores = cross_val_score(model, X_train_scaled, y_train, cv=5, scoring='r2')
+            # Cross-validation score
+            cv_scores = cross_val_score(model, X_train_scaled, y_train, cv=5, scoring='r2')
 
-        # Store in session state
-        st.session_state.model_trained = True
-        st.session_state.trained_model = model
-        st.session_state.model_type = model_type
-        st.session_state.scaler = scaler
-        st.session_state.selected_features = selected_features
-        st.session_state.model_metrics = {
-            'train_r2': train_r2,
-            'test_r2': test_r2,
-            'train_rmse': train_rmse,
-            'test_rmse': test_rmse,
-            'train_mae': train_mae,
-            'test_mae': test_mae,
-            'cv_mean': cv_scores.mean(),
-            'cv_std': cv_scores.std()
-        }
+            # Store in session state
+            st.session_state.model_trained = True
+            st.session_state.trained_model = model
+            st.session_state.model_type = model_type
+            st.session_state.scaler = scaler
+            st.session_state.selected_features = selected_features
+            st.session_state.model_metrics = {
+                'train_r2': train_r2,
+                'test_r2': test_r2,
+                'train_rmse': train_rmse,
+                'test_rmse': test_rmse,
+                'train_mae': train_mae,
+                'test_mae': test_mae,
+                'cv_mean': cv_scores.mean(),
+                'cv_std': cv_scores.std()
+            }
 
-        # Feature importance - handled differently by models
-        st.session_state.feature_importance = None # Reset first
-        if hasattr(model, 'feature_importances_'):
-            st.session_state.feature_importance = dict(zip(selected_features, model.feature_importances_))
-        elif hasattr(model, 'coef_'):
-            st.session_state.feature_importance = dict(zip(selected_features, abs(model.coef_)))
+            # Feature importance - handled differently by models
+            st.session_state.feature_importance = None # Reset first
+            if hasattr(model, 'feature_importances_'):
+                st.session_state.feature_importance = dict(zip(selected_features, model.feature_importances_))
+            elif hasattr(model, 'coef_'):
+                # Handle different coefficient shapes
+                coef = model.coef_
+                if len(coef.shape) > 1:
+                    coef = coef.flatten()
+                st.session_state.feature_importance = dict(zip(selected_features, abs(coef)))
 
-        st.success("Model trained successfully! 🎉")
+            st.success(f"{model_type} model trained successfully! 🎉")
+            
+        except Exception as e:
+            st.error(f"Error training model: {str(e)}")
 
 # Display model performance
 if st.session_state.model_trained:
@@ -385,6 +470,39 @@ if st.session_state.model_trained:
 
     with col4:
         st.markdown(f'<div class="model-performance"><strong>CV Score</strong><br>{metrics["cv_mean"]:.3f} ± {metrics["cv_std"]:.3f}</div>', unsafe_allow_html=True)
+
+    # Additional performance metrics
+    st.subheader("🔍 Detailed Performance Analysis")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Model comparison chart (if multiple models have been trained)
+        st.markdown("*Training vs Test Performance*")
+        performance_data = pd.DataFrame({
+            'Metric': ['R²', 'RMSE', 'MAE'],
+            'Training': [metrics['train_r2'], metrics['train_rmse'], metrics['train_mae']],
+            'Test': [metrics['test_r2'], metrics['test_rmse'], metrics['test_mae']]
+        })
+        
+        fig_perf = px.bar(
+            performance_data.melt(id_vars=['Metric'], var_name='Dataset', value_name='Value'),
+            x='Metric', y='Value', color='Dataset', barmode='group',
+            title=f'{st.session_state.model_type} Performance Comparison'
+        )
+        st.plotly_chart(fig_perf, use_container_width=True)
+
+    with col2:
+        # Cross-validation scores distribution
+        st.markdown("*Cross-Validation Scores*")
+        try:
+            cv_scores = cross_val_score(st.session_state.trained_model, 
+                                      st.session_state.scaler.transform(X), y, cv=5, scoring='r2')
+            fig_cv = px.box(y=cv_scores, title="CV Score Distribution")
+            fig_cv.update_layout(yaxis_title="R² Score")
+            st.plotly_chart(fig_cv, use_container_width=True)
+        except:
+            st.info("Cross-validation visualization not available for this model.")
 
     # Feature importance plot
     if st.session_state.feature_importance:
@@ -421,7 +539,9 @@ if st.session_state.model_trained:
         y=y_pred_test,
         mode='markers',
         name='Predictions vs Actual',
-        marker=dict(color='blue', size=8, opacity=0.7)
+        marker=dict(color='blue', size=8, opacity=0.7),
+        text=[f'Actual: {a:.2f}<br>Predicted: {p:.2f}' for a, p in zip(y_test, y_pred_test)],
+        hovertemplate='%{text}<extra></extra>'
     ))
 
     # Perfect prediction line
@@ -432,16 +552,39 @@ if st.session_state.model_trained:
         y=[min_val, max_val],
         mode='lines',
         name='Perfect Prediction',
-        line=dict(dash='dash', color='red')
+        line=dict(dash='dash', color='red', width=2)
     ))
 
     fig_pred.update_layout(
-        title='Model Predictions vs Actual Values',
+        title=f'{st.session_state.model_type} Predictions vs Actual Values',
         xaxis_title='Actual Water Level (m)',
         yaxis_title='Predicted Water Level (m)',
         height=500
     )
     st.plotly_chart(fig_pred, use_container_width=True)
+
+    # Residual plot
+    st.subheader("📊 Residual Analysis")
+    residuals = y_test - y_pred_test
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        fig_residual = px.scatter(
+            x=y_pred_test, y=residuals,
+            title="Residuals vs Predicted Values",
+            labels={'x': 'Predicted Water Level (m)', 'y': 'Residuals'}
+        )
+        fig_residual.add_hline(y=0, line_dash="dash", line_color="red")
+        st.plotly_chart(fig_residual, use_container_width=True)
+    
+    with col2:
+        fig_residual_hist = px.histogram(
+            residuals, nbins=20,
+            title="Distribution of Residuals",
+            labels={'value': 'Residuals', 'count': 'Frequency'}
+        )
+        st.plotly_chart(fig_residual_hist, use_container_width=True)
 
 # Prediction Interface
 st.header("🔮 Make Predictions")
@@ -468,87 +611,62 @@ if st.session_state.model_trained:
     if 'Day' in st.session_state.selected_features:
         input_data['Day'] = st.number_input("Day", value=datetime.now().day, min_value=1, max_value=31)
 
-    if st.button("🔮 Predict Water Level", type="primary"):
-        # Prepare input data
-        for feature in st.session_state.selected_features:
-            if feature == 'Temperature_C':
-                input_data[feature] = temp
-            elif feature == 'Rainfall_mm':
-                input_data[feature] = rainfall
-            elif feature == 'pH':
-                input_data[feature] = ph
-            elif feature == 'Dissolved_Oxygen_mg_L':
-                input_data[feature] = do
-            elif feature not in input_data: # For lag/rolling features not covered above
-                # Use the mean of the column from the original filtered data as a placeholder
-                input_data[feature] = filtered_df[feature].mean()
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("🔮 Predict Water Level", type="primary"):
+            # Prepare input data
+            for feature in st.session_state.selected_features:
+                if feature == 'Temperature_C':
+                    input_data[feature] = temp
+                elif feature == 'Rainfall_mm':
+                    input_data[feature] = rainfall
+                elif feature == 'pH':
+                    input_data[feature] = ph
+                elif feature == 'Dissolved_Oxygen_mg_L':
+                    input_data[feature] = do
+                elif feature not in input_data: # For lag/rolling features not covered above
+                    # Use the mean of the column from the original filtered data as a placeholder
+                    input_data[feature] = filtered_df[feature].mean()
 
-        # Convert to DataFrame and scale, ensuring column order is correct
-        input_df = pd.DataFrame([input_data])[st.session_state.selected_features]
-        input_scaled = st.session_state.scaler.transform(input_df)
+            # Convert to DataFrame and scale, ensuring column order is correct
+            input_df = pd.DataFrame([input_data])[st.session_state.selected_features]
+            input_scaled = st.session_state.scaler.transform(input_df)
 
-        # Make prediction
-        prediction = st.session_state.trained_model.predict(input_scaled)[0]
+            # Make prediction
+            prediction = st.session_state.trained_model.predict(input_scaled)[0]
 
-        # Display result
-        st.success(f"🎯 **Predicted Water Level: {prediction:.2f} meters**")
+            # Display result
+            st.success(f"🎯 *Predicted Water Level: {prediction:.2f} meters*")
 
-        # Status interpretation
-        if prediction > 5:
-            status = "Safe ✅"
-            status_color = "green"
-        elif 3 < prediction <= 5:
-            status = "Semi-Critical ⚠️"
-            status_color = "orange"
-        elif 2 < prediction <= 3:
-            status = "Critical ❗"
-            status_color = "red"
-        else:
-            status = "Over-exploited ❌"
-            status_color = "darkred"
+            # Status interpretation
+            if prediction > 5:
+                status = "Safe ✅"
+                status_color = "green"
+            elif 3 < prediction <= 5:
+                status = "Semi-Critical ⚠"
+                status_color = "orange"
+            elif 2 < prediction <= 3:
+                status = "Critical ❗"
+                status_color = "red"
+            else:
+                status = "Over-exploited ❌"
+                status_color = "darkred"
 
-        st.markdown(f'**Status:** <span style="color: {status_color}">{status}</span>', unsafe_allow_html=True)
-
-else:
-    st.info("Please train a model first to make predictions.")
-
-# Model Export
-st.header("💾 Model Management")
-
-if st.session_state.model_trained:
-    if st.button("💾 Export Model"):
-        model_data = {
-            'model': st.session_state.trained_model,
-            'scaler': st.session_state.scaler,
-            'features': st.session_state.selected_features,
-            'model_type': st.session_state.model_type,
-            'metrics': st.session_state.model_metrics
-        }
-
-        # Save model
-        joblib.dump(model_data, 'groundwater_model.pkl')
-        st.success("Model exported as 'groundwater_model.pkl'")
-
-# Data table
-st.header("📋 Data Table")
-st.dataframe(filtered_df, use_container_width=True)
-
-# Download button
-csv = filtered_df.to_csv(index=False)
-st.download_button(
-    label="📥 Download Data as CSV",
-    data=csv,
-    file_name=f"groundwater_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-    mime="text/csv"
-)
-
-# Footer
-st.markdown("---")
-st.markdown("""
-<div style='text-align: center; color: #666; padding: 2rem;'>
-    <p>💧 Groundwater Level ML Analysis Dashboard</p>
-    <p>Built with ❤️ using Streamlit and Scikit-learn</p>
-    <p>Enhanced version of your original model with ML capabilities!</p>
-</div>
-""", unsafe_allow_html=True)
-
+            st.markdown(f'*Status:* <span style="color: {status_color}">{status}</span>', unsafe_allow_html=True)
+            
+            # Confidence visualization (if available)
+            if hasattr(st.session_state.trained_model, 'predict_proba'):
+                st.info("This model provides prediction confidence intervals.")
+    
+    with col2:
+        if st.button("📊 Batch Prediction", type="secondary"):
+            st.info("Upload a CSV file with the same features to make batch predictions!")
+            uploaded_file = st.file_uploader("Choose CSV file", type="csv")
+            
+            if uploaded_file is not None:
+                try:
+                    batch_df = pd.read_csv(uploaded_file)
+                    # Process batch predictions
+                    batch_scaled = st.session_state.scaler.transform(batch_df[st.session_state.selected_features])
+                    batch_predictions = st.session_state.trained_model.predict(batch_scaled)

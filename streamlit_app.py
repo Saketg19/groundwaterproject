@@ -69,12 +69,14 @@ with tab1:
 
     @st.cache_data
     def load_data():
+        # --- NEW DEBUGGING LINE ---
+        # This will show us exactly what secrets are available to the app.
+        st.write("Available secrets:", st.secrets.to_dict())
+        # --------------------------
         try:
-            # --- MODIFIED SECTION ---
             # Load data from the URL specified in Streamlit's secrets
             data_url = st.secrets["DATA_URL"]
             df = pd.read_csv(data_url)
-            # --- END OF MODIFICATION ---
 
             df['Date'] = pd.to_datetime(df['Date'])
             df = df.sort_values('Date').reset_index(drop=True)
@@ -210,3 +212,4 @@ with tab2:
                     st.pyplot(fig)
             except Exception as e:
                 st.error(f"NASA POWER fetch failed: {e}")
+

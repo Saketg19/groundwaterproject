@@ -275,7 +275,6 @@ if show_environmental:
 
 # Machine Learning Section
 st.header("🤖 Machine Learning Model Training")
-st.markdown("Choose from *13 different algorithms* including 6 newly added models!")
 
 # Model selection with categorization
 model_categories = {

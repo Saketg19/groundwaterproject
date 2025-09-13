@@ -12,7 +12,7 @@ from streamlit_folium import st_folium
 from sklearn.utils import resample
 from sklearn.base import clone
 import plotly.express as px
-
+import streamlit as st
 # -------------------------
 # CONFIG (fill keys here)
 # -------------------------

@@ -8,3 +8,8 @@ matplotlib>=3.7.0
 seaborn>=0.12.0
 xarray
 googlemaps
+streamlit-folium 
+folium 
+geopy 
+netCDF4 
+plotly

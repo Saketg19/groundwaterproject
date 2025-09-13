@@ -610,90 +610,48 @@ if st.session_state.model_trained:
         ph = st.number_input("pH", value=7.0, step=0.1, min_value=0.0, max_value=14.0)
         do = st.number_input("Dissolved Oxygen (mg/L)", value=8.0, step=0.1, min_value=0.0)
 
-    # Additional features if selected
     input_data = {}
-    if 'Year' in st.session_state.selected_features:
-        input_data['Year'] = st.number_input("Year", value=datetime.now().year, min_value=2020, max_value=2030)
-    if 'Month' in st.session_state.selected_features:
-        input_data['Month'] = st.number_input("Month", value=datetime.now().month, min_value=1, max_value=12)
-    if 'Day' in st.session_state.selected_features:
-        input_data['Day'] = st.number_input("Day", value=datetime.now().day, min_value=1, max_value=31)
 
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        if st.button("🔮 Predict Water Level", type="primary"):
-            # Prepare input data
-            for feature in st.session_state.selected_features:
-                if feature == 'Temperature_C':
-                    input_data[feature] = temp
-                elif feature == 'Rainfall_mm':
-                    input_data[feature] = rainfall
-                elif feature == 'pH':
-                    input_data[feature] = ph
-                elif feature == 'Dissolved_Oxygen_mg_L':
-                    input_data[feature] = do
-                elif feature not in input_data: # For lag/rolling features not covered above
-                    input_data[feature] = filtered_df[feature].mean()
+    if st.button("🔮 Predict Water Level", type="primary"):
+        # Prepare input data
+        for feature in st.session_state.selected_features:
+            if feature == 'Temperature_C':
+                input_data[feature] = temp
+            elif feature == 'Rainfall_mm':
+                input_data[feature] = rainfall
+            elif feature == 'pH':
+                input_data[feature] = ph
+            elif feature == 'Dissolved_Oxygen_mg_L':
+                input_data[feature] = do
+            elif feature not in input_data: # For lag/rolling/temporal features
+                input_data[feature] = filtered_df[feature].mean()
 
-            # Convert to DataFrame and scale
-            input_df = pd.DataFrame([input_data])[st.session_state.selected_features]
-            input_scaled = st.session_state.scaler.transform(input_df)
+        # Convert to DataFrame and scale
+        input_df = pd.DataFrame([input_data])[st.session_state.selected_features]
+        input_scaled = st.session_state.scaler.transform(input_df)
 
-            # Make prediction
-            prediction = st.session_state.trained_model.predict(input_scaled)[0]
+        # Make prediction
+        prediction = st.session_state.trained_model.predict(input_scaled)[0]
 
-            # Display result
-            st.success(f"🎯 **Predicted Water Level: {prediction:.2f} meters**")
+        # Display result
+        st.success(f"🎯 **Predicted Water Level: {prediction:.2f} meters**")
 
-            # Status interpretation
-            if prediction > 5:
-                status = "Safe ✅"
-                status_color = "green"
-            elif 3 < prediction <= 5:
-                status = "Semi-Critical ⚠️"
-                status_color = "orange"
-            elif 2 < prediction <= 3:
-                status = "Critical ❗"
-                status_color = "red"
-            else:
-                status = "Over-exploited ❌"
-                status_color = "darkred"
+        # Status interpretation
+        if prediction > 5:
+            status = "Safe ✅"
+            status_color = "green"
+        elif 3 < prediction <= 5:
+            status = "Semi-Critical ⚠️"
+            status_color = "orange"
+        elif 2 < prediction <= 3:
+            status = "Critical ❗"
+            status_color = "red"
+        else:
+            status = "Over-exploited ❌"
+            status_color = "darkred"
 
-            st.markdown(f'**Status:** <span style="color: {status_color}">{status}</span>', unsafe_allow_html=True)
+        st.markdown(f'**Status:** <span style="color: {status_color}">{status}</span>', unsafe_allow_html=True)
             
-    with col2:
-        if st.checkbox("📊 Perform Batch Prediction"):
-            batch_file = st.file_uploader("Upload CSV for Batch Prediction", type="csv", key="batch")
-            
-            if batch_file is not None:
-                try:
-                    batch_df = pd.read_csv(batch_file, engine='python', on_bad_lines='skip')
-                    st.write("Uploaded Batch Data:", batch_df.head())
-
-                    required_cols = st.session_state.selected_features
-                    if not all(col in batch_df.columns for col in required_cols):
-                        missing_cols = set(required_cols) - set(batch_df.columns)
-                        st.error(f"The uploaded file is missing required columns: {', '.join(missing_cols)}")
-                    else:
-                        batch_scaled = st.session_state.scaler.transform(batch_df[required_cols])
-                        batch_predictions = st.session_state.trained_model.predict(batch_scaled)
-
-                        results_df = batch_df.copy()
-                        results_df['Predicted_Water_Level_m'] = batch_predictions
-                        st.success("Batch prediction complete!")
-                        st.dataframe(results_df)
-
-                        csv_results = results_df.to_csv(index=False).encode('utf-8')
-                        st.download_button(
-                            label="📥 Download Predictions",
-                            data=csv_results,
-                            file_name='batch_predictions.csv',
-                            mime='text/csv',
-                        )
-                except Exception as e:
-                    st.error(f"An error occurred during batch prediction: {e}")
-
 else:
     st.info("Please train a model first to make predictions.")
 

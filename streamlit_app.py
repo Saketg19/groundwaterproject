@@ -72,14 +72,7 @@ with tab1:
         try:
             # Load data from the URL specified in Streamlit's secrets
             data_url = st.secrets["DATA_URL"]
-            df = pd.read_csv(data_url, engine='python', on_bad_lines='skip')
-
-            # --- NEW DEBUGGING LINES ---
-            st.write("### Raw Data Head:")
-            st.write(df.head())
-            st.write("### Raw Data Columns:")
-            st.write(df.columns)
-            # --- END OF DEBUGGING ---
+            df = pd.read_csv(data_url)
 
             df['Date'] = pd.to_datetime(df['Date'])
             df = df.sort_values('Date').reset_index(drop=True)
@@ -99,7 +92,7 @@ with tab1:
             df = df.dropna()
             return df
         except Exception as e:
-            st.error(f"❌ Error loading data from the remote URL: {e}")
+            st.error(f"❌ Error loading or processing data: {e}")
             return None
 
     df = load_data()

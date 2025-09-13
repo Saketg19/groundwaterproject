@@ -75,6 +75,13 @@ with tab1:
             # Use 'python' engine and skip bad lines to handle formatting errors
             df = pd.read_csv(data_url, engine='python', on_bad_lines='skip')
 
+            # --- DEBUGGING LINES TO INSPECT THE DATA ---
+            st.write("### Raw Data Head (first 5 rows):")
+            st.write(df.head())
+            st.write("### Column Names Found:")
+            st.write(df.columns.tolist())
+            # --- END OF DEBUGGING ---
+
             df['Date'] = pd.to_datetime(df['Date'])
             df = df.sort_values('Date').reset_index(drop=True)
 
